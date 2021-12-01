@@ -41,7 +41,8 @@ public class EarthdataHDFPointMapper
         implements FlatMapFunction<Iterator<String>, Geometry>
 {
 
-    /**
+    private EarthdataHDFPointMapperProduct earthdataHDFPointMapperProduct = new EarthdataHDFPointMapperProduct();
+	/**
      * The geolocation field.
      */
     private final String geolocationField = "Geolocation_Fields";
@@ -57,14 +58,6 @@ public class EarthdataHDFPointMapper
      * The data field name.
      */
     private final String dataFieldName = "Data_Fields";
-    /**
-     * The data variable list.
-     */
-    private final String[] dataVariableList;
-    /**
-     * The data path list.
-     */
-    private final String[] dataPathList;
     /**
      * The offset.
      */
@@ -115,19 +108,8 @@ public class EarthdataHDFPointMapper
      */
     public EarthdataHDFPointMapper(int offset, int increment, String rootGroupName, String[] dataVariableList, String dataVariableName, boolean switchCoordinateXY)
     {
-        this.offset = offset;
-        this.increment = increment;
-        this.rootGroupName = rootGroupName;
-        this.dataVariableList = dataVariableList;
-        this.dataVariableName = dataVariableName;
-        this.longitudePath = this.rootGroupName + "/" + this.geolocationField + "/" + this.longitudeName;
-        this.latitudePath = this.rootGroupName + "/" + this.geolocationField + "/" + this.latitudeName;
-        this.dataPath = this.rootGroupName + "/" + this.dataFieldName + "/" + this.dataVariableName;
-        this.dataPathList = new String[dataVariableList.length];
-        for (int i = 0; i < dataVariableList.length; i++) {
-            dataPathList[i] = this.rootGroupName + "/" + this.dataFieldName + "/" + dataVariableList[i];
-        }
         this.switchCoordinateXY = switchCoordinateXY;
+		EarthdataHDFPointMapperExtracted2(offset, increment, rootGroupName, dataVariableList, dataVariableName);
     }
 
     /**
@@ -141,18 +123,7 @@ public class EarthdataHDFPointMapper
      */
     public EarthdataHDFPointMapper(int offset, int increment, String rootGroupName, String[] dataVariableList, String dataVariableName)
     {
-        this.offset = offset;
-        this.increment = increment;
-        this.rootGroupName = rootGroupName;
-        this.dataVariableList = dataVariableList;
-        this.dataVariableName = dataVariableName;
-        this.longitudePath = this.rootGroupName + "/" + this.geolocationField + "/" + this.longitudeName;
-        this.latitudePath = this.rootGroupName + "/" + this.geolocationField + "/" + this.latitudeName;
-        this.dataPath = this.rootGroupName + "/" + this.dataFieldName + "/" + this.dataVariableName;
-        this.dataPathList = new String[dataVariableList.length];
-        for (int i = 0; i < dataVariableList.length; i++) {
-            dataPathList[i] = this.rootGroupName + "/" + this.dataFieldName + "/" + dataVariableList[i];
-        }
+        EarthdataHDFPointMapperExtracted2(offset, increment, rootGroupName, dataVariableList, dataVariableName);
     }
 
     /**
@@ -169,20 +140,10 @@ public class EarthdataHDFPointMapper
     public EarthdataHDFPointMapper(int offset, int increment, String rootGroupName, String[] dataVariableList, String dataVariableName,
             boolean switchCoordinateXY, String urlPrefix)
     {
-        this.offset = offset;
-        this.increment = increment;
-        this.rootGroupName = rootGroupName;
-        this.dataVariableList = dataVariableList;
-        this.dataVariableName = dataVariableName;
-        this.longitudePath = this.rootGroupName + "/" + this.geolocationField + "/" + this.longitudeName;
-        this.latitudePath = this.rootGroupName + "/" + this.geolocationField + "/" + this.latitudeName;
-        this.dataPath = this.rootGroupName + "/" + this.dataFieldName + "/" + this.dataVariableName;
-        this.dataPathList = new String[dataVariableList.length];
-        for (int i = 0; i < dataVariableList.length; i++) {
-            dataPathList[i] = this.rootGroupName + "/" + this.dataFieldName + "/" + dataVariableList[i];
-        }
-        this.switchCoordinateXY = switchCoordinateXY;
-        this.urlPrefix = urlPrefix;
+        EarthdataHDFPointMapperExtracted(offset, increment, rootGroupName, dataVariableList, dataVariableName,
+				urlPrefix, () -> {
+					this.switchCoordinateXY = switchCoordinateXY;
+				});
     }
 
     /**
@@ -198,19 +159,9 @@ public class EarthdataHDFPointMapper
     public EarthdataHDFPointMapper(int offset, int increment, String rootGroupName, String[] dataVariableList, String dataVariableName,
             String urlPrefix)
     {
-        this.offset = offset;
-        this.increment = increment;
-        this.rootGroupName = rootGroupName;
-        this.dataVariableList = dataVariableList;
-        this.dataVariableName = dataVariableName;
-        this.longitudePath = this.rootGroupName + "/" + this.geolocationField + "/" + this.longitudeName;
-        this.latitudePath = this.rootGroupName + "/" + this.geolocationField + "/" + this.latitudeName;
-        this.dataPath = this.rootGroupName + "/" + this.dataFieldName + "/" + this.dataVariableName;
-        this.dataPathList = new String[dataVariableList.length];
-        for (int i = 0; i < dataVariableList.length; i++) {
-            dataPathList[i] = this.rootGroupName + "/" + this.dataFieldName + "/" + dataVariableList[i];
-        }
-        this.urlPrefix = urlPrefix;
+        EarthdataHDFPointMapperExtracted(offset, increment, rootGroupName, dataVariableList, dataVariableName,
+				urlPrefix, () -> {
+				});
     }
 
     @Override
@@ -219,42 +170,87 @@ public class EarthdataHDFPointMapper
     {
         List<Geometry> hdfData = new ArrayList<Geometry>();
         while (stringIterator.hasNext()) {
-            String hdfAddress = stringIterator.next();
+            Array[] dataArrayList = earthdataHDFPointMapperProduct.dataArrayList(stringIterator, this.urlPrefix);
+			String hdfAddress = stringIterator.next();
             NetcdfDataset netcdfSet = SerNetCDFUtils.loadNetCDFDataSet(urlPrefix + hdfAddress);
             Array longitudeArray = SerNetCDFUtils.getNetCDF2DArray(netcdfSet, this.longitudePath);
             Array latitudeArray = SerNetCDFUtils.getNetCDF2DArray(netcdfSet, this.latitudePath);
             Array dataArray = SerNetCDFUtils.getNetCDF2DArray(netcdfSet, this.dataPath);
-            Array[] dataArrayList = new Array[this.dataVariableList.length];
-            for (int i = 0; i < this.dataVariableList.length; i++) {
-                dataArrayList[i] = SerNetCDFUtils.getNetCDF2DArray(netcdfSet, dataPathList[i]);
-            }
             int[] geolocationShape = longitudeArray.getShape();
             GeometryFactory geometryFactory = new GeometryFactory();
             for (int j = 0; j < geolocationShape[0]; j++) {
                 for (int i = 0; i < geolocationShape[1]; i++) {
-                    // We probably need to switch longitude and latitude if needed.
-                    Coordinate coordinate = null;
-                    if (switchCoordinateXY) {
-                        coordinate = new Coordinate(SerNetCDFUtils.getDataSym(longitudeArray, j, i),
-                                SerNetCDFUtils.getDataSym(latitudeArray, j, i), SerNetCDFUtils.getDataAsym(dataArray, j, i, offset, increment));
-                    }
-                    else {
-                        coordinate = new Coordinate(SerNetCDFUtils.getDataSym(latitudeArray, j, i),
-                                SerNetCDFUtils.getDataSym(longitudeArray, j, i), SerNetCDFUtils.getDataAsym(dataArray, j, i, offset, increment));
-                    }
-                    Point observation = geometryFactory.createPoint(coordinate);
-                    String userData = "";
-
-                    for (int k = 0; k < dataVariableList.length - 1; k++) {
-                        userData += SerNetCDFUtils.getDataAsym(dataArrayList[k], j, i, offset, increment) + " ";
-                    }
-                    userData += SerNetCDFUtils.getDataAsym(dataArrayList[dataVariableList.length - 1], j, i, offset, increment);
-
-                    observation.setUserData(userData);
-                    hdfData.add(observation);
+                    Point observation = observation(longitudeArray, latitudeArray, dataArray, dataArrayList,
+							geometryFactory, j, i);
+					hdfData.add(observation);
                 }
             }
         }
         return hdfData.iterator();
     }
+
+	private Point observation(Array longitudeArray, Array latitudeArray, Array dataArray, Array[] dataArrayList,
+			GeometryFactory geometryFactory, int j, int i) {
+		Coordinate coordinate = coordinate(longitudeArray, latitudeArray, dataArray, j, i);
+		Point observation = geometryFactory.createPoint(coordinate);
+		String userData = userData(dataArrayList, j, i);
+		observation.setUserData(userData);
+		return observation;
+	}
+
+	private String userData(Array[] dataArrayList, int j, int i) {
+		String userData = "";
+		for (int k = 0; k < earthdataHDFPointMapperProduct.getDataVariableList().length - 1; k++) {
+			userData += SerNetCDFUtils.getDataAsym(dataArrayList[k], j, i, offset, increment) + " ";
+		}
+		userData += SerNetCDFUtils.getDataAsym(dataArrayList[earthdataHDFPointMapperProduct.getDataVariableList().length - 1], j, i, offset, increment);
+		return userData;
+	}
+
+	private Coordinate coordinate(Array longitudeArray, Array latitudeArray, Array dataArray, int j, int i) {
+		Coordinate coordinate = null;
+		if (switchCoordinateXY) {
+			coordinate = new Coordinate(SerNetCDFUtils.getDataSym(longitudeArray, j, i),
+					SerNetCDFUtils.getDataSym(latitudeArray, j, i),
+					SerNetCDFUtils.getDataAsym(dataArray, j, i, offset, increment));
+		} else {
+			coordinate = new Coordinate(SerNetCDFUtils.getDataSym(latitudeArray, j, i),
+					SerNetCDFUtils.getDataSym(longitudeArray, j, i),
+					SerNetCDFUtils.getDataAsym(dataArray, j, i, offset, increment));
+		}
+		return coordinate;
+	}
+
+	@FunctionalInterface
+	private interface Interface0 {
+		void apply();
+	}
+
+	private void EarthdataHDFPointMapperExtracted(int offset, int increment, String rootGroupName,
+			String[] dataVariableList, String dataVariableName, String urlPrefix, Interface0 arg0) {
+		arg0.apply();
+				this.urlPrefix = urlPrefix;
+				EarthdataHDFPointMapperExtracted3(offset, increment, rootGroupName, dataVariableList, dataVariableName);
+	}
+
+	private void EarthdataHDFPointMapperExtracted2(int offset, int increment, String rootGroupName,
+			String[] dataVariableList, String dataVariableName) {
+		EarthdataHDFPointMapperExtracted3(offset, increment, rootGroupName, dataVariableList, dataVariableName);
+	}
+
+	private void EarthdataHDFPointMapperExtracted3(int offset, int increment, String rootGroupName,
+			String[] dataVariableList, String dataVariableName) {
+		this.offset = offset;
+		this.increment = increment;
+		this.rootGroupName = rootGroupName;
+		earthdataHDFPointMapperProduct.setDataVariableList(dataVariableList);
+		this.dataVariableName = dataVariableName;
+		this.longitudePath = this.rootGroupName + "/" + this.geolocationField + "/" + this.longitudeName;
+		this.latitudePath = this.rootGroupName + "/" + this.geolocationField + "/" + this.latitudeName;
+		this.dataPath = this.rootGroupName + "/" + this.dataFieldName + "/" + this.dataVariableName;
+		earthdataHDFPointMapperProduct.setDataPathList(new String[dataVariableList.length]);
+		for (int i = 0; i < dataVariableList.length; i++) {
+			earthdataHDFPointMapperProduct.getDataPathList()[i] = this.rootGroupName + "/" + this.dataFieldName + "/" + dataVariableList[i];
+		}
+	}
 }

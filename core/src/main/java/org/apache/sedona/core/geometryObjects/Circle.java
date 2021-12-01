@@ -19,6 +19,7 @@
 
 package org.apache.sedona.core.geometryObjects;
 
+import java.util.function.Consumer;
 import org.apache.sedona.core.utils.GeomUtils;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.CoordinateFilter;
@@ -50,7 +51,7 @@ public class Circle
     /**
      * The center point.
      */
-    private final Coordinate centerPoint;
+    private Coordinate centerPoint;
     /**
      * The radius.
      */
@@ -70,16 +71,11 @@ public class Circle
     {
         super(new GeometryFactory(centerGeometry.getPrecisionModel()));
         this.centerGeometry = centerGeometry;
-        Envelope centerGeometryMBR = this.centerGeometry.getEnvelopeInternal();
-        this.centerPoint = new Coordinate((centerGeometryMBR.getMinX() + centerGeometryMBR.getMaxX()) / 2.0,
-                (centerGeometryMBR.getMinY() + centerGeometryMBR.getMaxY()) / 2.0);
-        // Get the internal radius of the object. We need to make sure that the circle at least should be the minimum circumscribed circle
-        double width = centerGeometryMBR.getMaxX() - centerGeometryMBR.getMinX();
-        double length = centerGeometryMBR.getMaxY() - centerGeometryMBR.getMinY();
-        double centerGeometryInternalRadius = Math.sqrt(width * width + length * length) / 2;
-        this.radius = givenRadius > centerGeometryInternalRadius ? givenRadius : centerGeometryInternalRadius;
-        this.MBR = new Envelope(this.centerPoint.x - this.radius, this.centerPoint.x + this.radius, this.centerPoint.y - this.radius, this.centerPoint.y + this.radius);
-        this.setUserData(centerGeometry.getUserData());
+        radiusInCircle(givenRadius, (Envelope centerGeometryMBR) -> {
+			this.centerPoint = new Coordinate((centerGeometryMBR.getMinX() + centerGeometryMBR.getMaxX()) / 2.0,
+					(centerGeometryMBR.getMinY() + centerGeometryMBR.getMaxY()) / 2.0);
+		});
+		this.setUserData(centerGeometry.getUserData());
     }
 
     /**
@@ -119,13 +115,8 @@ public class Circle
      */
     public void setRadius(Double givenRadius)
     {
-        // Get the internal radius of the object. We need to make sure that the circle at least should be the minimum circumscribed circle
-        Envelope centerGeometryMBR = this.centerGeometry.getEnvelopeInternal();
-        double width = centerGeometryMBR.getMaxX() - centerGeometryMBR.getMinX();
-        double length = centerGeometryMBR.getMaxY() - centerGeometryMBR.getMinY();
-        double centerGeometryInternalRadius = Math.sqrt(width * width + length * length) / 2;
-        this.radius = givenRadius > centerGeometryInternalRadius ? givenRadius : centerGeometryInternalRadius;
-        this.MBR = new Envelope(this.centerPoint.x - this.radius, this.centerPoint.x + this.radius, this.centerPoint.y - this.radius, this.centerPoint.y + this.radius);
+        radiusInCircle(givenRadius, (Envelope centerGeometryMBR) -> {
+		});
     }
 
     /* (non-Javadoc)
@@ -473,18 +464,7 @@ public class Circle
     @Override
     protected int compareToSameClass(Object other)
     {
-        Envelope env = (Envelope) other;
-        Envelope mbr = this.MBR;
-        // compare based on numerical ordering of ordinates
-        if (mbr.getMinX() < env.getMinX()) { return -1; }
-        if (mbr.getMinX() > env.getMinX()) { return 1; }
-        if (mbr.getMinY() < env.getMinY()) { return -1; }
-        if (mbr.getMinY() > env.getMinY()) { return 1; }
-        if (mbr.getMaxX() < env.getMaxX()) { return -1; }
-        if (mbr.getMaxX() > env.getMaxX()) { return 1; }
-        if (mbr.getMaxY() < env.getMaxY()) { return -1; }
-        if (mbr.getMaxY() > env.getMaxY()) { return 1; }
-        return 0;
+        return compareToSameClassExtracted(other);
     }
 
     /* (non-Javadoc)
@@ -493,18 +473,7 @@ public class Circle
     @Override
     protected int compareToSameClass(Object other, CoordinateSequenceComparator comp)
     {
-        Envelope env = (Envelope) other;
-        Envelope mbr = this.MBR;
-        // compare based on numerical ordering of ordinates
-        if (mbr.getMinX() < env.getMinX()) { return -1; }
-        if (mbr.getMinX() > env.getMinX()) { return 1; }
-        if (mbr.getMinY() < env.getMinY()) { return -1; }
-        if (mbr.getMinY() > env.getMinY()) { return 1; }
-        if (mbr.getMaxX() < env.getMaxX()) { return -1; }
-        if (mbr.getMaxX() > env.getMaxX()) { return 1; }
-        if (mbr.getMaxY() < env.getMaxY()) { return -1; }
-        if (mbr.getMaxY() > env.getMaxY()) { return 1; }
-        return 0;
+        return compareToSameClassExtracted(other);
     }
 
     @Override
@@ -518,4 +487,45 @@ public class Circle
     {
         return "Circle of radius " + radius + " around " + centerGeometry;
     }
+
+	private void radiusInCircle(Double givenRadius, Consumer<Envelope> arg0) {
+		Envelope centerGeometryMBR = this.centerGeometry.getEnvelopeInternal();
+		arg0.accept(centerGeometryMBR);
+		double width = centerGeometryMBR.getMaxX() - centerGeometryMBR.getMinX();
+		double length = centerGeometryMBR.getMaxY() - centerGeometryMBR.getMinY();
+		double centerGeometryInternalRadius = Math.sqrt(width * width + length * length) / 2;
+		this.radius = givenRadius > centerGeometryInternalRadius ? givenRadius : centerGeometryInternalRadius;
+		this.MBR = new Envelope(this.centerPoint.x - this.radius, this.centerPoint.x + this.radius,
+				this.centerPoint.y - this.radius, this.centerPoint.y + this.radius);
+	}
+
+	private int compareToSameClassExtracted(Object other) {
+		Envelope env = (Envelope) other;
+		Envelope mbr = this.MBR;
+		if (mbr.getMinX() < env.getMinX()) {
+			return -1;
+		}
+		if (mbr.getMinX() > env.getMinX()) {
+			return 1;
+		}
+		if (mbr.getMinY() < env.getMinY()) {
+			return -1;
+		}
+		if (mbr.getMinY() > env.getMinY()) {
+			return 1;
+		}
+		if (mbr.getMaxX() < env.getMaxX()) {
+			return -1;
+		}
+		if (mbr.getMaxX() > env.getMaxX()) {
+			return 1;
+		}
+		if (mbr.getMaxY() < env.getMaxY()) {
+			return -1;
+		}
+		if (mbr.getMaxY() > env.getMaxY()) {
+			return 1;
+		}
+		return 0;
+	}
 }

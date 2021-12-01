@@ -58,7 +58,8 @@ public class ShapefileRDD
         implements Serializable
 {
 
-    /**
+    private ShapefileRDDProduct shapefileRDDProduct = new ShapefileRDDProduct();
+	/**
      * The geometry factory.
      */
     public static GeometryFactory geometryFactory = new GeometryFactory();
@@ -98,10 +99,6 @@ public class ShapefileRDD
         }
     };
     /**
-     * shape collection.
-     */
-    private JavaRDD<Geometry> shapeRDD = null;
-    /**
      * bounding box.
      */
     private BoundBox boundBox = null;
@@ -122,7 +119,7 @@ public class ShapefileRDD
                 PrimitiveShape.class,
                 sparkContext.hadoopConfiguration()
         );
-        shapeRDD = shapePrimitiveRdd.map(PrimitiveToShape);
+        shapefileRDDProduct.setShapeRDD(shapePrimitiveRdd.map(PrimitiveToShape));
     }
 
     /**
@@ -132,7 +129,7 @@ public class ShapefileRDD
      */
     public JavaRDD<Geometry> getShapeRDD()
     {
-        return this.shapeRDD;
+        return this.shapefileRDDProduct.getShapeRDD();
     }
 
     /**
@@ -142,30 +139,7 @@ public class ShapefileRDD
      */
     public JavaRDD<Point> getPointRDD()
     {
-        return shapeRDD.flatMap(new FlatMapFunction<Geometry, Point>()
-        {
-            @Override
-            public Iterator<Point> call(Geometry spatialObject)
-                    throws Exception
-            {
-                List<Point> result = new ArrayList<Point>();
-                if (spatialObject instanceof MultiPoint) {
-                    MultiPoint multiObjects = (MultiPoint) spatialObject;
-                    for (int i = 0; i < multiObjects.getNumGeometries(); i++) {
-                        Point oneObject = (Point) multiObjects.getGeometryN(i);
-                        oneObject.setUserData(multiObjects.getUserData());
-                        result.add(oneObject);
-                    }
-                }
-                else if (spatialObject instanceof Point) {
-                    result.add((Point) spatialObject);
-                }
-                else {
-                    throw new Exception("[ShapefileRDD][getPointRDD] the object type is not Point or MultiPoint type. It is " + spatialObject.getGeometryType());
-                }
-                return result.iterator();
-            }
-        });
+        return shapefileRDDProduct.getPointRDD();
     }
 
     /**
@@ -175,30 +149,7 @@ public class ShapefileRDD
      */
     public JavaRDD<Polygon> getPolygonRDD()
     {
-        return shapeRDD.flatMap(new FlatMapFunction<Geometry, Polygon>()
-        {
-            @Override
-            public Iterator<Polygon> call(Geometry spatialObject)
-                    throws Exception
-            {
-                List<Polygon> result = new ArrayList<Polygon>();
-                if (spatialObject instanceof MultiPolygon) {
-                    MultiPolygon multiObjects = (MultiPolygon) spatialObject;
-                    for (int i = 0; i < multiObjects.getNumGeometries(); i++) {
-                        Polygon oneObject = (Polygon) multiObjects.getGeometryN(i);
-                        oneObject.setUserData(multiObjects.getUserData());
-                        result.add(oneObject);
-                    }
-                }
-                else if (spatialObject instanceof Polygon) {
-                    result.add((Polygon) spatialObject);
-                }
-                else {
-                    throw new Exception("[ShapefileRDD][getPolygonRDD] the object type is not Polygon or MultiPolygon type. It is " + spatialObject.getGeometryType());
-                }
-                return result.iterator();
-            }
-        });
+        return shapefileRDDProduct.getPolygonRDD();
     }
 
     /**
@@ -208,30 +159,7 @@ public class ShapefileRDD
      */
     public JavaRDD<LineString> getLineStringRDD()
     {
-        return shapeRDD.flatMap(new FlatMapFunction<Geometry, LineString>()
-        {
-            @Override
-            public Iterator<LineString> call(Geometry spatialObject)
-                    throws Exception
-            {
-                List<LineString> result = new ArrayList<LineString>();
-                if (spatialObject instanceof MultiLineString) {
-                    MultiLineString multiObjects = (MultiLineString) spatialObject;
-                    for (int i = 0; i < multiObjects.getNumGeometries(); i++) {
-                        LineString oneObject = (LineString) multiObjects.getGeometryN(i);
-                        oneObject.setUserData(multiObjects.getUserData());
-                        result.add(oneObject);
-                    }
-                }
-                else if (spatialObject instanceof LineString) {
-                    result.add((LineString) spatialObject);
-                }
-                else {
-                    throw new Exception("[ShapefileRDD][getLineStringRDD] the object type is not LineString or MultiLineString type. It is " + spatialObject.getGeometryType());
-                }
-                return result.iterator();
-            }
-        });
+        return shapefileRDDProduct.getLineStringRDD();
     }
 
     /**
@@ -241,7 +169,7 @@ public class ShapefileRDD
      */
     public long count()
     {
-        return shapeRDD.count();
+        return shapefileRDDProduct.count();
     }
 
     /**
